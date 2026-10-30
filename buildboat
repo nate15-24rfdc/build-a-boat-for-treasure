@@ -1,0 +1,472 @@
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local gravityNormal = workspace.Gravity
+local isRunning = false
+getgenv().HalloweenFarm = false
+local flyActive = false
+local noclipActive = false
+local godModeActive = false
+local speed = 375
+local flySpeed = 50
+local lastDeathCFrame = nil
+local keysDown = {}
+local flyBodyGyro = nil
+local flyBodyVelocity = nil
+local godModeConnection = nil
+local destinations = {
+CFrame.new(-43.6134491, 62.1137619, 672.744934, -0.999842644, -0.00183729955, 0.017645346, 0, 0.994622767, 0.103564225, -0.0177407414, 0.103547923, -0.994466245),
+CFrame.new(-60.1504707, 97.4659729, 8767.91406, -0.99889338, 0.000705028593, 0.0470264405, 0, 0.999887645, -0.0149902813, -0.047031723, -0.0149736926, -0.998781145),
+CFrame.new(-54.331871, -345.398346, 9488.60645, -0.98221302, 0, -0.187770084, 0, 1, 0, -0.187770084, 0, -0.98221302),
+}
+local targetGuiContainer = player:FindFirstChildOfClass("PlayerGui")
+pcall(function()
+if game:GetService("CoreGui") then
+targetGuiContainer = game:GetService("CoreGui")
+end
+end)
+if targetGuiContainer:FindFirstChild("AutoFarmUI") then
+targetGuiContainer.AutoFarmUI:Destroy()
+end
+local screenGui = Instance.new("ScreenGui", targetGuiContainer)
+screenGui.Name = "AutoFarmUI"
+screenGui.ResetOnSpawn = false
+local menu = Instance.new("Frame")
+menu.Size = UDim2.fromScale(0.28, 0.68)
+menu.Position = UDim2.fromScale(0.36, 0.16)
+menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+menu.BorderSizePixel = 0
+menu.Active = true
+menu.Draggable = true
+menu.ClipsDescendants = true
+menu.Parent = screenGui
+local menuCorner = Instance.new("UICorner")
+menuCorner.CornerRadius = UDim.new(0, 12)
+menuCorner.Parent = menu
+local sizeConstraint = Instance.new("UISizeConstraint")
+sizeConstraint.MinSize = Vector2.new(200, 250)
+sizeConstraint.MaxSize = Vector2.new(800, 900)
+sizeConstraint.Parent = menu
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.fromScale(0.8, 0.08)
+titleLabel.Position = UDim2.fromScale(0.05, 0.02)
+titleLabel.Text = "TonesXIIX's build a boat for treasure script!"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextScaled = true
+titleLabel.BackgroundTransparency = 1
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = menu
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromScale(0.08, 0.06)
+close.Position = UDim2.fromScale(0.88, 0.03)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+close.TextColor3 = Color3.new(1, 1, 1)
+close.Font = Enum.Font.SourceSansBold
+close.TextScaled = true
+close.Parent = menu
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = close
+local function createToggleRow(labelName, positionY, offColor, onColor)
+local row = Instance.new("Frame")
+row.Size = UDim2.fromScale(0.9, 0.09)
+row.Position = UDim2.fromScale(0.05, positionY)
+row.BackgroundTransparency = 1
+row.Parent = menu
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromScale(0.65, 1)
+label.Position = UDim2.fromScale(0, 0)
+label.Text = labelName
+label.TextColor3 = Color3.fromRGB(230, 230, 230)
+label.TextScaled = true
+label.BackgroundTransparency = 1
+label.Font = Enum.Font.SourceSansSemibold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = row
+local switchBtn = Instance.new("TextButton")
+switchBtn.Size = UDim2.fromScale(0.28, 0.9)
+switchBtn.Position = UDim2.fromScale(0.72, 0.05)
+switchBtn.Text = ""
+switchBtn.BackgroundColor3 = offColor
+switchBtn.BorderSizePixel = 0
+switchBtn.Parent = row
+local switchCorner = Instance.new("UICorner")
+switchCorner.CornerRadius = UDim.new(1, 0)
+switchCorner.Parent = switchBtn
+local knob = Instance.new("Frame")
+knob.Size = UDim2.fromScale(0.42, 0.84)
+knob.Position = UDim2.fromScale(0.08, 0.08)
+knob.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
+knob.BorderSizePixel = 0
+knob.Parent = switchBtn
+local knobCorner = Instance.new("UICorner")
+knobCorner.CornerRadius = UDim.new(1, 0)
+knobCorner.Parent = knob
+return switchBtn, knob
+end
+local goldBtn, goldKnob = createToggleRow("Gold Farm", 0.12, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 170, 255))
+local halloweenBtn, halloweenKnob = createToggleRow("Halloween Farm", 0.23, Color3.fromRGB(50, 50, 50), Color3.fromRGB(255, 120, 0))
+local flyBtn, flyKnob = createToggleRow("Fly", 0.34, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 200, 100))
+local sliderRow = Instance.new("Frame")
+sliderRow.Size = UDim2.fromScale(0.9, 0.13)
+sliderRow.Position = UDim2.fromScale(0.05, 0.45)
+sliderRow.BackgroundTransparency = 1
+sliderRow.Parent = menu
+local sliderLabel = Instance.new("TextLabel")
+sliderLabel.Size = UDim2.fromScale(1, 0.4)
+sliderLabel.Position = UDim2.fromScale(0, 0)
+sliderLabel.Text = "Flight Speed: 50"
+sliderLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+sliderLabel.TextScaled = true
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.Font = Enum.Font.SourceSansSemibold
+sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+sliderLabel.Parent = sliderRow
+local sliderTrack = Instance.new("Frame")
+sliderTrack.Size = UDim2.fromScale(1, 0.12)
+sliderTrack.Position = UDim2.fromScale(0, 0.65)
+sliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+sliderTrack.BorderSizePixel = 0
+sliderTrack.Parent = sliderRow
+local sliderTrackCorner = Instance.new("UICorner")
+sliderTrackCorner.CornerRadius = UDim.new(1, 0)
+sliderTrackCorner.Parent = sliderTrack
+local sliderKnob = Instance.new("TextButton")
+sliderKnob.Size = UDim2.fromScale(0.08, 3.5)
+sliderKnob.Position = UDim2.fromScale(0, -1.25)
+sliderKnob.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+sliderKnob.Text = ""
+sliderKnob.BorderSizePixel = 0
+sliderKnob.Parent = sliderTrack
+local sliderKnobCorner = Instance.new("UICorner")
+sliderKnobCorner.CornerRadius = UDim.new(1, 0)
+sliderKnobCorner.Parent = sliderKnob
+local noclipBtn, noclipKnob = createToggleRow("Noclip", 0.62, Color3.fromRGB(50, 50, 50), Color3.fromRGB(140, 0, 255))
+local godBtn, godKnob = createToggleRow("God Mode", 0.73, Color3.fromRGB(50, 50, 50), Color3.fromRGB(250, 50, 50))
+local resizeHandle = Instance.new("TextButton")
+resizeHandle.Size = UDim2.fromOffset(15, 15)
+resizeHandle.Position = UDim2.new(1, -15, 1, -15)
+resizeHandle.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+resizeHandle.Text = "◢"
+resizeHandle.TextColor3 = Color3.fromRGB(150, 150, 150)
+resizeHandle.TextScaled = true
+resizeHandle.BorderSizePixel = 0
+resizeHandle.ZIndex = 10
+resizeHandle.Parent = menu
+local resizeCorner = Instance.new("UICorner")
+resizeCorner.CornerRadius = UDim.new(0, 4)
+resizeCorner.Parent = resizeHandle
+local function animateSwitch(knob, switchBtn, state, targetColor)
+local targetPos = state and UDim2.fromScale(0.5, 0.08) or UDim2.fromScale(0.08, 0.08)
+local targetBgColor = state and targetColor or Color3.fromRGB(50, 50, 50)
+TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+TweenService:Create(switchBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetBgColor}):Play()
+end
+local function manualMoveToCFrame(targetCFrame)
+local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+if not root then return end
+local startCFrame = root.CFrame
+local distance = (startCFrame.Position - targetCFrame.Position).Magnitude
+local duration = distance / speed
+local startTime = os.clock()
+workspace.Gravity = 0
+while isRunning and (os.clock() - startTime) < duration do
+local character = player.Character
+local activeRoot = character and character:FindFirstChild("HumanoidRootPart")
+if not activeRoot then break end
+local alpha = math.clamp((os.clock() - startTime) / duration, 0, 1)
+activeRoot.CFrame = startCFrame:Lerp(targetCFrame, alpha)
+activeRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+activeRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+RunService.Heartbeat:Wait()
+end
+if isRunning and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+player.Character.HumanoidRootPart.CFrame = targetCFrame
+end
+end
+local isResizing = false
+local startMousePos, startSize
+resizeHandle.MouseButton1Down:Connect(function()
+isResizing = true
+startMousePos = UserInputService:GetMouseLocation()
+startSize = menu.AbsoluteSize
+end)
+UserInputService.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 then
+isResizing = false
+end
+end)
+RunService.RenderStepped:Connect(function()
+if isResizing then
+local currentMousePos = UserInputService:GetMouseLocation()
+local delta = currentMousePos - startMousePos
+menu.Size = UDim2.fromOffset(startSize.X + delta.X, startSize.Y + delta.Y)
+end
+end)
+UserInputService.InputBegan:Connect(function(input, processed)
+if processed then return end
+if input.UserInputType == Enum.UserInputType.Keyboard then
+keysDown[input.KeyCode] = true
+end
+end)
+UserInputService.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.Keyboard then
+keysDown[input.KeyCode] = nil
+end
+end)
+local isSliding = false
+sliderKnob.MouseButton1Down:Connect(function()
+isSliding = true
+end)
+UserInputService.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 then
+isSliding = false
+end
+end)
+RunService.RenderStepped:Connect(function()
+if isSliding then
+local mousePos = UserInputService:GetMouseLocation().X
+local trackPos = sliderTrack.AbsolutePosition.X
+local trackWidth = sliderTrack.AbsoluteSize.X
+local percentage = math.clamp((mousePos - trackPos) / trackWidth, 0, 1)
+sliderKnob.Position = UDim2.fromScale(percentage - (sliderKnob.Size.X.Scale / 2), -1.25)
+flySpeed = math.floor(50 + (percentage * (500 - 50)))
+sliderLabel.Text = "Flight Speed: " .. tostring(flySpeed)
+end
+end)
+local function cleanSelectionOutlines()
+if not godModeActive then return end
+local pGui = player:FindFirstChild("PlayerGui")
+if pGui then
+for _, child in pairs(pGui:GetChildren()) do
+if child:IsA("SelectionBox") or child:IsA("Highlight") or child:IsA("BoxHandleAdornment") or child.Name:lower():match("outline") or child.Name:lower():match("selection") or child.Name:lower():match("flash") or child.Name:lower():match("damage") or child.Name == "HealthGui" then
+child:Destroy()
+end
+end
+end
+for _, child in pairs(workspace:GetChildren()) do
+if child:IsA("SelectionBox") or child:IsA("Highlight") or child:IsA("BoxHandleAdornment") then
+child:Destroy()
+end
+end
+if player.Character then
+for _, obj in pairs(player.Character:GetDescendants()) do
+if obj:IsA("SelectionBox") or obj:IsA("Highlight") or obj:IsA("BoxHandleAdornment") then
+obj:Destroy()
+end
+end
+end
+local currentCamera = workspace.CurrentCamera
+if currentCamera then
+for _, child in pairs(currentCamera:GetChildren()) do
+if child:IsA("ScreenGui") or child:IsA("Frame") or child.Name:lower():match("flash") or child.Name:lower():match("damage") then
+child:Destroy()
+end
+end
+end
+end
+local function applyGodMode(character)
+if not godModeActive or not character then return end
+local humanoid = character:WaitForChild("Humanoid", 5)
+if humanoid then
+humanoid.WalkSpeed = 16
+local animate = character:FindFirstChild("Animate")
+if animate then
+animate.Disabled = true
+task.wait(0.05)
+if character and animate then
+animate.Disabled = false
+end
+end
+end
+local localCombat = character:FindFirstChild("LocalCombat")
+if localCombat then
+localCombat:Destroy()
+end
+for _, part in pairs(character:GetChildren()) do
+if part:IsA("BasePart") then
+if part.Name == "HumanoidRootPart" then
+part.CanTouch = true
+else
+part.CanTouch = false
+end
+end
+end
+cleanSelectionOutlines()
+if godModeConnection then
+godModeConnection:Disconnect()
+godModeConnection = nil
+end
+godModeConnection = RunService.Heartbeat:Connect(function()
+if godModeActive and character and character.Parent and humanoid and humanoid.Parent then
+if humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth then
+humanoid.Health = humanoid.MaxHealth
+end
+humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+if humanoid:GetState() == Enum.HumanoidStateType.None then
+humanoid:ChangeState(Enum.HumanoidStateType.Running)
+end
+cleanSelectionOutlines()
+else
+if godModeConnection then
+godModeConnection:Disconnect()
+godModeConnection = nil
+end
+end
+end)
+end
+RunService.Heartbeat:Connect(function()
+if godModeActive then
+cleanSelectionOutlines()
+end
+if player.Character then
+local root = player.Character:FindFirstChild("HumanoidRootPart")
+if noclipActive then
+for _, part in pairs(player.Character:GetDescendants()) do
+if part:IsA("BasePart") then
+part.CanCollide = false
+end
+end
+end
+if flyActive and root then
+local camera = workspace.CurrentCamera
+if not flyBodyGyro or flyBodyGyro.Parent ~= root then
+flyBodyGyro = Instance.new("BodyGyro", root)
+flyBodyGyro.P = 9e4
+flyBodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+end
+if not flyBodyVelocity or flyBodyVelocity.Parent ~= root then
+flyBodyVelocity = Instance.new("BodyVelocity", root)
+flyBodyVelocity.velocity = Vector3.new(0, 0, 0)
+flyBodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
+end
+flyBodyGyro.cframe = camera.CFrame
+local directionVector = Vector3.new(0, 0, 0)
+if keysDown[Enum.KeyCode.W] then directionVector = directionVector + camera.CFrame.LookVector end
+if keysDown[Enum.KeyCode.S] then directionVector = directionVector - camera.CFrame.LookVector end
+if keysDown[Enum.KeyCode.A] then directionVector = directionVector - camera.CFrame.RightVector end
+if keysDown[Enum.KeyCode.D] then directionVector = directionVector + camera.CFrame.RightVector end
+if keysDown[Enum.KeyCode.Space] then directionVector = directionVector + Vector3.new(0, 1, 0) end
+if keysDown[Enum.KeyCode.LeftShift] then directionVector = directionVector - Vector3.new(0, 1, 0) end
+flyBodyVelocity.velocity = directionVector.Unit * flySpeed
+if directionVector == Vector3.new(0,0,0) then flyBodyVelocity.velocity = Vector3.new(0,0,0) end
+else
+if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
+end
+end
+end)
+local function autoFarmLoop()
+while isRunning do
+local char = player.Character or player.CharacterAdded:Wait()
+local root = char:WaitForChild("HumanoidRootPart", 5)
+if not root then return end
+for i, cf in ipairs(destinations) do
+if not isRunning then return end
+manualMoveToCFrame(cf)
+end
+workspace.Gravity = gravityNormal
+repeat task.wait(1) until player.CharacterAdded:Wait()
+end
+end
+local function runHalloweenLoop()
+task.spawn(function()
+while task.wait(1) do
+if getgenv().HalloweenFarm == true then
+local char = player.Character
+local root = char and char:FindFirstChild("HumanoidRootPart")
+if root and workspace:FindFirstChild("Houses") then
+for i, v in pairs(workspace.Houses:GetChildren()) do
+if v:FindFirstChild("Door") and v.Door:FindFirstChild("DoorInnerTouch") then
+firetouchinterest(v.Door.DoorInnerTouch, root, 0)
+end
+end
+end
+else
+local char = player.Character
+local root = char and char:FindFirstChild("HumanoidRootPart")
+local head = char and char:FindFirstChild("Head")
+if root then lastDeathCFrame = root.CFrame end
+if head then
+local humanoid = char:FindFirstChildOfClass("Humanoid")
+if humanoid then humanoid.Health = 0 end
+head:Destroy()
+end
+break
+end
+end
+end)
+end
+goldBtn.MouseButton1Click:Connect(function()
+isRunning = not isRunning
+animateSwitch(goldKnob, goldBtn, isRunning, Color3.fromRGB(0, 170, 255))
+if isRunning then
+task.spawn(autoFarmLoop)
+else
+workspace.Gravity = gravityNormal
+end
+end)
+halloweenBtn.MouseButton1Click:Connect(function()
+getgenv().HalloweenFarm = not getgenv().HalloweenFarm
+animateSwitch(halloweenKnob, halloweenBtn, getgenv().HalloweenFarm, Color3.fromRGB(255, 120, 0))
+if getgenv().HalloweenFarm == true then runHalloweenLoop() end
+end)
+flyBtn.MouseButton1Click:Connect(function()
+flyActive = not flyActive
+animateSwitch(flyKnob, flyBtn, flyActive, Color3.fromRGB(0, 200, 100))
+end)
+noclipBtn.MouseButton1Click:Connect(function()
+noclipActive = not noclipActive
+animateSwitch(noclipKnob, noclipBtn, noclipActive, Color3.fromRGB(140, 0, 255))
+end)
+godBtn.MouseButton1Click:Connect(function()
+godModeActive = not godModeActive
+animateSwitch(godKnob, godBtn, godModeActive, Color3.fromRGB(250, 50, 50))
+if godModeActive and player.Character then
+applyGodMode(player.Character)
+else
+if godModeConnection then
+godModeConnection:Disconnect()
+godModeConnection = nil
+end
+if player.Character then
+for _, part in pairs(player.Character:GetChildren()) do
+if part:IsA("BasePart") then
+part.CanTouch = true
+end
+end
+end
+end
+end)
+close.MouseButton1Click:Connect(function()
+isRunning = false
+getgenv().HalloweenFarm = false
+flyActive = false
+noclipActive = false
+godModeActive = false
+if godModeConnection then
+godModeConnection:Disconnect()
+godModeConnection = nil
+end
+workspace.Gravity = gravityNormal
+screenGui:Destroy()
+end)
+player.CharacterAdded:Connect(function(char)
+task.wait(0.5)
+if godModeActive then
+applyGodMode(char)
+end
+if lastDeathCFrame and getgenv().HalloweenFarm == false then
+local root = char:WaitForChild("HumanoidRootPart", 5)
+if root then root.CFrame = lastDeathCFrame lastDeathCFrame = nil end
+end
+if isRunning then
+task.wait(0.5)
+task.spawn(autoFarmLoop)
+end
+end)
