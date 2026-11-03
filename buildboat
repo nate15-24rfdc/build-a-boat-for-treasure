@@ -2,10 +2,11 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local gravityNormal = workspace.Gravity
 local isRunning = false
-getgenv().HalloweenFarm = false
 local flyActive = false
 local noclipActive = false
 local godModeActive = false
@@ -21,6 +22,14 @@ CFrame.new(-43.6134491, 62.1137619, 672.744934, -0.999842644, -0.00183729955, 0.
 CFrame.new(-60.1504707, 97.4659729, 8767.91406, -0.99889338, 0.000705028593, 0.0470264405, 0, 0.999887645, -0.0149902813, -0.047031723, -0.0149736926, -0.998781145),
 CFrame.new(-54.331871, -345.398346, 9488.60645, -0.98221302, 0, -0.187770084, 0, 1, 0, -0.187770084, 0, -0.98221302),
 }
+local function getViableRoot(character)
+if not character then return nil end
+return character:FindFirstChild("HumanoidRootPart")
+or character:FindFirstChild("UpperTorso")
+or character:FindFirstChild("LowerTorso")
+or character:FindFirstChild("Torso")
+or character:FindFirstChildOfClass("BasePart")
+end
 local targetGuiContainer = player:FindFirstChildOfClass("PlayerGui")
 pcall(function()
 if game:GetService("CoreGui") then
@@ -34,19 +43,19 @@ local screenGui = Instance.new("ScreenGui", targetGuiContainer)
 screenGui.Name = "AutoFarmUI"
 screenGui.ResetOnSpawn = false
 local menu = Instance.new("Frame")
-menu.Size = UDim2.fromScale(0.28, 0.68)
-menu.Position = UDim2.fromScale(0.36, 0.16)
+menu.Size = UDim2.fromScale(0.28, 0.78)
+menu.Position = UDim2.fromScale(0.36, 0.11)
 menu.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 menu.BorderSizePixel = 0
 menu.Active = true
 menu.Draggable = true
 menu.ClipsDescendants = true
-menu.Parent = screenGui
+menu.Parent = menu.Parent or screenGui
 local menuCorner = Instance.new("UICorner")
 menuCorner.CornerRadius = UDim.new(0, 12)
 menuCorner.Parent = menu
 local sizeConstraint = Instance.new("UISizeConstraint")
-sizeConstraint.MinSize = Vector2.new(200, 250)
+sizeConstraint.MinSize = Vector2.new(200, 300)
 sizeConstraint.MaxSize = Vector2.new(800, 900)
 sizeConstraint.Parent = menu
 local titleLabel = Instance.new("TextLabel")
@@ -60,7 +69,7 @@ titleLabel.Font = Enum.Font.SourceSansBold
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = menu
 local close = Instance.new("TextButton")
-close.Size = UDim2.fromScale(0.08, 0.06)
+close.Size = UDim2.fromScale(0.08, 0.05)
 close.Position = UDim2.fromScale(0.88, 0.03)
 close.Text = "X"
 close.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
@@ -73,7 +82,7 @@ closeCorner.CornerRadius = UDim.new(0, 6)
 closeCorner.Parent = close
 local function createToggleRow(labelName, positionY, offColor, onColor)
 local row = Instance.new("Frame")
-row.Size = UDim2.fromScale(0.9, 0.09)
+row.Size = UDim2.fromScale(0.9, 0.08)
 row.Position = UDim2.fromScale(0.05, positionY)
 row.BackgroundTransparency = 1
 row.Parent = menu
@@ -108,12 +117,54 @@ knobCorner.CornerRadius = UDim.new(1, 0)
 knobCorner.Parent = knob
 return switchBtn, knob
 end
-local goldBtn, goldKnob = createToggleRow("Gold Farm", 0.12, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 170, 255))
-local halloweenBtn, halloweenKnob = createToggleRow("Halloween Farm", 0.23, Color3.fromRGB(50, 50, 50), Color3.fromRGB(255, 120, 0))
-local flyBtn, flyKnob = createToggleRow("Fly", 0.34, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 200, 100))
+local function createTeleportRow(labelName, positionY, targetPlaceId)
+local row = Instance.new("Frame")
+row.Size = UDim2.fromScale(0.9, 0.08)
+row.Position = UDim2.fromScale(0.05, positionY)
+row.BackgroundTransparency = 1
+row.Parent = menu
+local label = Instance.new("TextLabel")
+label.Size = UDim2.fromScale(0.65, 1)
+label.Position = UDim2.fromScale(0, 0)
+label.Text = labelName
+label.TextColor3 = Color3.fromRGB(230, 230, 230)
+label.TextScaled = true
+label.BackgroundTransparency = 1
+label.Font = Enum.Font.SourceSansSemibold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = row
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.fromScale(0.28, 0.9)
+tpBtn.Position = UDim2.fromScale(0.72, 0.05)
+tpBtn.Text = "Teleport"
+tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpBtn.Font = Enum.Font.SourceSansBold
+tpBtn.TextScaled = true
+tpBtn.BackgroundColor3 = Color3.fromRGB(255, 105, 180)
+tpBtn.BorderSizePixel = 0
+tpBtn.Parent = row
+local tpCorner = Instance.new("UICorner")
+tpCorner.CornerRadius = UDim.new(0, 6)
+tpCorner.Parent = tpBtn
+tpBtn.MouseButton1Click:Connect(function()
+tpBtn.Text = "Teleporting..."
+tpBtn.Active = false
+task.spawn(function()
+pcall(function()
+TeleportService:Teleport(targetPlaceId, player)
+end)
+task.wait(2)
+tpBtn.Text = "Teleport"
+tpBtn.Active = true
+end)
+end)
+return tpBtn
+end
+local goldBtn, goldKnob = createToggleRow("Gold Farm", 0.11, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 170, 255))
+local flyBtn, flyKnob = createToggleRow("Fly", 0.21, Color3.fromRGB(50, 50, 50), Color3.fromRGB(0, 200, 100))
 local sliderRow = Instance.new("Frame")
-sliderRow.Size = UDim2.fromScale(0.9, 0.13)
-sliderRow.Position = UDim2.fromScale(0.05, 0.45)
+sliderRow.Size = UDim2.fromScale(0.9, 0.10)
+sliderRow.Position = UDim2.fromScale(0.05, 0.31)
 sliderRow.BackgroundTransparency = 1
 sliderRow.Parent = menu
 local sliderLabel = Instance.new("TextLabel")
@@ -145,8 +196,9 @@ sliderKnob.Parent = sliderTrack
 local sliderKnobCorner = Instance.new("UICorner")
 sliderKnobCorner.CornerRadius = UDim.new(1, 0)
 sliderKnobCorner.Parent = sliderKnob
-local noclipBtn, noclipKnob = createToggleRow("Noclip", 0.62, Color3.fromRGB(50, 50, 50), Color3.fromRGB(140, 0, 255))
-local godBtn, godKnob = createToggleRow("God Mode", 0.73, Color3.fromRGB(50, 50, 50), Color3.fromRGB(250, 50, 50))
+local noclipBtn, noclipKnob = createToggleRow("Noclip", 0.43, Color3.fromRGB(50, 50, 50), Color3.fromRGB(140, 0, 255))
+local godBtn, godKnob = createToggleRow("God Mode", 0.53, Color3.fromRGB(50, 50, 50), Color3.fromRGB(250, 50, 50))
+local easterTpBtn = createTeleportRow("Easter Boss Fight", 0.63, 1930863474)
 local resizeHandle = Instance.new("TextButton")
 resizeHandle.Size = UDim2.fromOffset(15, 15)
 resizeHandle.Position = UDim2.new(1, -15, 1, -15)
@@ -167,7 +219,7 @@ TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingD
 TweenService:Create(switchBtn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = targetBgColor}):Play()
 end
 local function manualMoveToCFrame(targetCFrame)
-local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+local root = getViableRoot(player.Character)
 if not root then return end
 local startCFrame = root.CFrame
 local distance = (startCFrame.Position - targetCFrame.Position).Magnitude
@@ -175,8 +227,7 @@ local duration = distance / speed
 local startTime = os.clock()
 workspace.Gravity = 0
 while isRunning and (os.clock() - startTime) < duration do
-local character = player.Character
-local activeRoot = character and character:FindFirstChild("HumanoidRootPart")
+local activeRoot = getViableRoot(player.Character)
 if not activeRoot then break end
 local alpha = math.clamp((os.clock() - startTime) / duration, 0, 1)
 activeRoot.CFrame = startCFrame:Lerp(targetCFrame, alpha)
@@ -184,8 +235,9 @@ activeRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 activeRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 RunService.Heartbeat:Wait()
 end
-if isRunning and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-player.Character.HumanoidRootPart.CFrame = targetCFrame
+local finalRoot = getViableRoot(player.Character)
+if isRunning and finalRoot then
+finalRoot.CFrame = targetCFrame
 end
 end
 local isResizing = false
@@ -325,7 +377,7 @@ if godModeActive then
 cleanSelectionOutlines()
 end
 if player.Character then
-local root = player.Character:FindFirstChild("HumanoidRootPart")
+local root = getViableRoot(player.Character)
 if noclipActive then
 for _, part in pairs(player.Character:GetDescendants()) do
 if part:IsA("BasePart") then
@@ -336,11 +388,13 @@ end
 if flyActive and root then
 local camera = workspace.CurrentCamera
 if not flyBodyGyro or flyBodyGyro.Parent ~= root then
+if flyBodyGyro then flyBodyGyro:Destroy() end
 flyBodyGyro = Instance.new("BodyGyro", root)
 flyBodyGyro.P = 9e4
 flyBodyGyro.maxTorque = Vector3.new(9e9, 9e9, 9e9)
 end
 if not flyBodyVelocity or flyBodyVelocity.Parent ~= root then
+if flyBodyVelocity then flyBodyVelocity:Destroy() end
 flyBodyVelocity = Instance.new("BodyVelocity", root)
 flyBodyVelocity.velocity = Vector3.new(0, 0, 0)
 flyBodyVelocity.maxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -354,7 +408,9 @@ if keysDown[Enum.KeyCode.D] then directionVector = directionVector + camera.CFra
 if keysDown[Enum.KeyCode.Space] then directionVector = directionVector + Vector3.new(0, 1, 0) end
 if keysDown[Enum.KeyCode.LeftShift] then directionVector = directionVector - Vector3.new(0, 1, 0) end
 flyBodyVelocity.velocity = directionVector.Unit * flySpeed
-if directionVector == Vector3.new(0,0,0) then flyBodyVelocity.velocity = Vector3.new(0,0,0) end
+if directionVector == Vector3.new(0,0,0) then
+flyBodyVelocity.velocity = Vector3.new(0,0,0)
+end
 else
 if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
 if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
@@ -364,8 +420,11 @@ end)
 local function autoFarmLoop()
 while isRunning do
 local char = player.Character or player.CharacterAdded:Wait()
-local root = char:WaitForChild("HumanoidRootPart", 5)
-if not root then return end
+local root = getViableRoot(char)
+if not root then
+task.wait(0.5)
+continue
+end
 for i, cf in ipairs(destinations) do
 if not isRunning then return end
 manualMoveToCFrame(cf)
@@ -373,34 +432,6 @@ end
 workspace.Gravity = gravityNormal
 repeat task.wait(1) until player.CharacterAdded:Wait()
 end
-end
-local function runHalloweenLoop()
-task.spawn(function()
-while task.wait(1) do
-if getgenv().HalloweenFarm == true then
-local char = player.Character
-local root = char and char:FindFirstChild("HumanoidRootPart")
-if root and workspace:FindFirstChild("Houses") then
-for i, v in pairs(workspace.Houses:GetChildren()) do
-if v:FindFirstChild("Door") and v.Door:FindFirstChild("DoorInnerTouch") then
-firetouchinterest(v.Door.DoorInnerTouch, root, 0)
-end
-end
-end
-else
-local char = player.Character
-local root = char and char:FindFirstChild("HumanoidRootPart")
-local head = char and char:FindFirstChild("Head")
-if root then lastDeathCFrame = root.CFrame end
-if head then
-local humanoid = char:FindFirstChildOfClass("Humanoid")
-if humanoid then humanoid.Health = 0 end
-head:Destroy()
-end
-break
-end
-end
-end)
 end
 goldBtn.MouseButton1Click:Connect(function()
 isRunning = not isRunning
@@ -410,11 +441,6 @@ task.spawn(autoFarmLoop)
 else
 workspace.Gravity = gravityNormal
 end
-end)
-halloweenBtn.MouseButton1Click:Connect(function()
-getgenv().HalloweenFarm = not getgenv().HalloweenFarm
-animateSwitch(halloweenKnob, halloweenBtn, getgenv().HalloweenFarm, Color3.fromRGB(255, 120, 0))
-if getgenv().HalloweenFarm == true then runHalloweenLoop() end
 end)
 flyBtn.MouseButton1Click:Connect(function()
 flyActive = not flyActive
@@ -445,7 +471,6 @@ end
 end)
 close.MouseButton1Click:Connect(function()
 isRunning = false
-getgenv().HalloweenFarm = false
 flyActive = false
 noclipActive = false
 godModeActive = false
@@ -461,9 +486,12 @@ task.wait(0.5)
 if godModeActive then
 applyGodMode(char)
 end
-if lastDeathCFrame and getgenv().HalloweenFarm == false then
-local root = char:WaitForChild("HumanoidRootPart", 5)
-if root then root.CFrame = lastDeathCFrame lastDeathCFrame = nil end
+if lastDeathCFrame then
+local root = getViableRoot(char)
+if root then
+root.CFrame = lastDeathCFrame
+lastDeathCFrame = nil
+end
 end
 if isRunning then
 task.wait(0.5)
